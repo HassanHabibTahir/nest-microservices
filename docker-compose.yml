@@ -1,0 +1,70 @@
+version: '3.9'
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/microservices-chat-app/Dockerfile
+    container_name: gateway
+    ports:
+      - '3000:3000'
+    depends_on:
+      - auth-service
+      - chat-service
+    networks:
+      - micro-network
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - '3001:3001'
+    depends_on:
+      - auth-db
+    environment:
+      MONGO_URI: mongodb://auth-db:27017/auth_db
+    networks:
+      - micro-network
+
+  chat-service:
+    build:
+      context: .
+      dockerfile: apps/chat-service/Dockerfile
+    container_name: chat-service
+    ports:
+      - '3002:3002'
+    depends_on:
+      - chat-db
+    environment:
+      MONGO_URI: mongodb://chat-db:27017/chat_db
+    networks:
+      - micro-network
+
+  auth-db:
+    image: mongo:7
+    container_name: auth-db
+    ports:
+      - '27017:27017'
+    volumes:
+      - auth-data:/data/db
+    networks:
+      - micro-network
+
+  chat-db:
+    image: mongo:7
+    container_name: chat-db
+    ports:
+      - '27018:27017'
+    volumes:
+      - chat-data:/data/db
+    networks:
+      - micro-network
+
+networks:
+  micro-network:
+
+volumes:
+  auth-data:
+  chat-data:
