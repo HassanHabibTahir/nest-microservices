@@ -74,11 +74,11 @@ await app.listen(); // binds TCP socket and waits for messages
 
 Key difference from a normal NestJS app:
 
-| Normal NestJS App             | Microservice                          |
-| ----------------------------- | ------------------------------------- |
-| `NestFactory.create()`        | `NestFactory.createMicroservice()`    |
-| `app.listen(3000)` HTTP server| `app.listen()` binds a TCP socket     |
-| Receives HTTP requests        | Receives TCP messages                 |
+| Normal NestJS App              | Microservice                       |
+| ------------------------------ | ---------------------------------- |
+| `NestFactory.create()`         | `NestFactory.createMicroservice()` |
+| `app.listen(3000)` HTTP server | `app.listen()` binds a TCP socket  |
+| Receives HTTP requests         | Receives TCP messages              |
 
 ---
 
@@ -100,11 +100,11 @@ register(@Payload() data: { email: string; password: string; name: string }) {
 
 `@MessagePattern` is like `@Get()` / `@Post()` — but for TCP messages instead of HTTP routes.
 
-| HTTP Controller   | Microservice Controller   |
-| ----------------- | ------------------------- |
+| HTTP Controller   | Microservice Controller             |
+| ----------------- | ----------------------------------- |
 | `@Get('/login')`  | `@MessagePattern({ cmd: 'login' })` |
-| `@Body()`         | `@Payload()`              |
-| Returns HTTP body | Returns TCP response      |
+| `@Body()`         | `@Payload()`                        |
+| Returns HTTP body | Returns TCP response                |
 
 ---
 
@@ -115,7 +115,7 @@ register(@Payload() data: { email: string; password: string; name: string }) {
 
 ClientsModule.register([
   {
-    name: 'AUTH_SERVICE',        // token name used for injection
+    name: 'AUTH_SERVICE', // token name used for injection
     transport: Transport.TCP,
     options: { host: 'localhost', port: 3001 },
   },
@@ -124,10 +124,11 @@ ClientsModule.register([
     transport: Transport.TCP,
     options: { host: 'localhost', port: 3002 },
   },
-])
+]);
 ```
 
 This tells NestJS:
+
 - Create a TCP client called `AUTH_SERVICE` that connects to port 3001
 - Create a TCP client called `CHAT_SERVICE` that connects to port 3002
 
@@ -156,6 +157,7 @@ export class AppService {
 ```
 
 `ClientProxy.send(pattern, data)`:
+
 - **`pattern`** — must match the `@MessagePattern` on the receiving service
 - **`data`** — the payload sent over TCP
 - Returns an **Observable** (RxJS) — NestJS automatically subscribes and sends the result as HTTP response
@@ -210,15 +212,17 @@ service, which forwards it over TCP to auth-service.
 
 ## Port Map
 
-| Service                  | Port | Protocol | Handles                                             |
-| ------------------------ | ---- | -------- | --------------------------------------------------- |
+| Service                  | Port | Protocol | Handles                                                                            |
+| ------------------------ | ---- | -------- | ---------------------------------------------------------------------------------- |
 | `microservices-chat-app` | 3000 | HTTP     | `POST /auth/login`, `POST /auth/register`, `POST /chat/send`, `GET /chat/messages` |
-| `auth-service`           | 3001 | TCP      | `{ cmd: 'login' }`, `{ cmd: 'register' }`          |
-| `chat-service`           | 3002 | TCP      | `{ cmd: 'send_message' }`, `{ cmd: 'get_messages' }` |
+| `auth-service`           | 3001 | TCP      | `{ cmd: 'login' }`, `{ cmd: 'register' }`                                          |
+| `chat-service`           | 3002 | TCP      | `{ cmd: 'send_message' }`, `{ cmd: 'get_messages' }`                               |
 
 ---
 
 ## Running the App
+
+### Option A — Local (without Docker)
 
 Install dependencies:
 
@@ -237,6 +241,79 @@ yarn start:dev auth-service
 
 # Terminal 3 — Chat Service (TCP)
 yarn start:dev chat-service
+```
+
+---
+
+### Option B — Docker
+
+#### Start all services (first time or after changes)
+
+```bash
+docker-compose up --build
+```
+
+#### Start in background (detached mode)
+
+```bash
+docker-compose up --build -d
+```
+
+#### After editing source code — rebuild required
+
+The Dockerfile compiles TypeScript at build time. A plain restart won't pick up code changes — you must **rebuild**.
+
+```bash
+# Rebuild and restart a single service
+docker-compose up --build gateway
+
+# Rebuild and restart all services
+docker-compose up --build
+
+# Rebuild with no cache (force fresh npm install)
+docker-compose build --no-cache && docker-compose up
+```
+
+#### Restart containers (no rebuild — for env/config changes only)
+
+```bash
+docker-compose restart gateway       # single service
+docker-compose restart               # all services
+```
+
+> **Rule of thumb:** edited `.ts` files → use `--build`. Changed only `.env` → `restart` is enough.
+
+#### Stop containers
+
+```bash
+docker-compose down          # stop, keep volumes (databases intact)
+docker-compose down -v       # stop and delete volumes (resets all databases)
+```
+
+#### View logs
+
+```bash
+docker-compose logs -f              # all services
+docker-compose logs -f gateway      # gateway only
+docker-compose logs -f auth-service
+docker-compose logs -f chat-service
+```
+
+#### Docker port map
+
+| Container    | Host port | Container port | Protocol |
+| ------------ | --------- | -------------- | -------- |
+| gateway      | 3000      | 3000           | HTTP     |
+| auth-service | 3001      | 3001           | TCP      |
+| chat-service | 3002      | 3002           | TCP      |
+| auth-db      | 27017     | 27017          | MongoDB  |
+| chat-db      | 27018     | 27017          | MongoDB  |
+
+#### Health check
+
+```bash
+curl http://localhost:3000/health
+# { "status": "ok", "timestamp": "...", "services": ["auth-service", "chat-service"] }
 ```
 
 ---
@@ -277,14 +354,14 @@ curl http://localhost:3000/chat/messages?userId=user1
 
 ## Key Concepts Summary
 
-| Concept                        | Where Used                  | What It Does                                              |
-| ------------------------------ | --------------------------- | --------------------------------------------------------- |
-| `NestFactory.createMicroservice()` | auth/chat `main.ts`     | Starts a TCP server instead of HTTP                       |
-| `@MessagePattern()`            | auth/chat controllers       | Declares which messages this method handles               |
-| `@Payload()`                   | auth/chat controllers       | Extracts data from TCP message (like `@Body()` for HTTP)  |
-| `ClientsModule.register()`     | main app module             | Registers TCP clients to connect to services              |
-| `@Inject('NAME')`              | main app service            | Injects the TCP client by its registered name             |
-| `ClientProxy.send()`           | main app service            | Sends a message and waits for response (returns Observable)|
+| Concept                            | Where Used            | What It Does                                                |
+| ---------------------------------- | --------------------- | ----------------------------------------------------------- |
+| `NestFactory.createMicroservice()` | auth/chat `main.ts`   | Starts a TCP server instead of HTTP                         |
+| `@MessagePattern()`                | auth/chat controllers | Declares which messages this method handles                 |
+| `@Payload()`                       | auth/chat controllers | Extracts data from TCP message (like `@Body()` for HTTP)    |
+| `ClientsModule.register()`         | main app module       | Registers TCP clients to connect to services                |
+| `@Inject('NAME')`                  | main app service      | Injects the TCP client by its registered name               |
+| `ClientProxy.send()`               | main app service      | Sends a message and waits for response (returns Observable) |
 
 ---
 

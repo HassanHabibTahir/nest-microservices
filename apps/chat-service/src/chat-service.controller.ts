@@ -4,6 +4,9 @@ import { ChatServiceService } from './chat-service.service';
 
 @Controller()
 export class ChatServiceController {
+  getHello(): any {
+    throw new Error('Method not implemented.');
+  }
   constructor(private readonly chatServiceService: ChatServiceService) {}
 
   @MessagePattern({ cmd: 'send_message' })

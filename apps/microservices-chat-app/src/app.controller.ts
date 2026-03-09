@@ -5,6 +5,24 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  @Get()
+  healthCheck() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: ['auth-service', 'chat-service'],
+    };
+  }
+
+  @Get('health')
+  health() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      services: ['auth-service', 'chat-service'],
+    };
+  }
+
   @Post('auth/login')
   login(@Body() body: { email: string; password: string }) {
     return this.appService.login(body);
